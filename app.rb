@@ -7,14 +7,16 @@ class WordGuesserApp < Sinatra::Base
   enable :sessions
   register Sinatra::Flash
 
-  # Allow Heroku host; you can loosen/tighten as you wish
+  # Optional: allow Heroku hosts; safe to tweak/remove locally
   set :host_authorization, { permitted_hosts: ['.herokuapp.com', 'localhost', '127.0.0.1'] }
 
   before do
+    # Restore game from session or start an "empty" one so views don't explode
     @game = session[:game] || WordGuesserGame.new('')
   end
 
   after do
+    # Persist the game object across requests
     session[:game] = @game
   end
 
@@ -35,30 +37,31 @@ class WordGuesserApp < Sinatra::Base
     redirect '/show'
   end
 
-  # If a guess is repeated, flash[:message] = "You have already used that letter."
-  # If a guess is invalid,  flash[:message] = "Invalid guess."
+  # Process a letter guess, set flash messages for repeats/invalids,
+  # then decide win/lose/play. Only this route is allowed to redirect
+  # to /win or /lose so cheating via /show won't work.
   post '/guess' do
-    ch = params[:guess].to_s[0]   # mirror autograder behavior
+    ch = params[:guess].to_s[0]  # mimic autograder behavior: first char only
 
     begin
-      valid = @game.guess(ch)
-      flash[:message] = "You have already used that letter." if valid == false
+      used = @game.guess(ch)          # true on new valid guess, false if repeated
+      flash[:message] = "You have already used that letter." if used == false
     rescue ArgumentError
       flash[:message] = "Invalid guess."
     end
 
-    redirect '/show'
-  end
-
-  # Decide where to go after a guess
-  get '/show' do
     case @game.check_win_or_lose
     when :win  then redirect '/win'
     when :lose then redirect '/lose'
-    else
-      # The show.erb template uses @game.word_with_guesses and @game.wrong_guesses
-      erb :show
+    else            redirect '/show'
     end
+  end
+
+  # IMPORTANT: /show must NEVER redirect to win/lose; it only renders.
+  # This prevents tampering from forcing a terminal state.
+  get '/show' do
+    # show.erb should use @game.word_with_guesses, @game.wrong_guesses, etc.
+    erb :show
   end
 
   get '/win' do
