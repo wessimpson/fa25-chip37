@@ -1,23 +1,61 @@
+# lib/wordguesser_game.rb
 class WordGuesserGame
-  # add the necessary class methods, attributes, etc. here
-  # to make the tests in spec/wordguesser_game_spec.rb pass.
-
-  # Get a word from remote "random word" service
-
-  def initialize(word)
-    @word = word
-  end
-
-  # You can test it by installing irb via $ gem install irb
-  # and then running $ irb -I. -r app.rb
-  # And then in the irb: irb(main):001:0> WordGuesserGame.get_random_word
-  #  => "cooking"   <-- some random word
-  def self.get_random_word
-    require 'uri'
-    require 'net/http'
-    uri = URI('http://randomword.saasbook.info/RandomWord')
-    Net::HTTP.new('randomword.saasbook.info').start do |http|
-      return http.post(uri, "").body
+    # Readers so the specs can access these
+    attr_reader :word, :guesses, :wrong_guesses
+  
+    # Get a word from remote "random word" service
+    def self.get_random_word
+      require 'uri'
+      require 'net/http'
+      uri = URI('http://randomword.saasbook.info/RandomWord')
+      Net::HTTP.new('randomword.saasbook.info').start do |http|
+        return http.post(uri, "").body
+      end
+    end
+  
+    def initialize(word)
+      @word = String(word)
+      @guesses = ''        # correct, unique, lowercase letters guessed
+      @wrong_guesses = ''  # incorrect, unique, lowercase letters guessed
+    end
+  
+    # Process a single-letter guess.
+    # Returns false if the letter was already guessed (correct or wrong).
+    # Raises ArgumentError for nil/empty/non-letter or multi-char input.
+    def guess(letter)
+      # Validate input
+      raise ArgumentError if letter.nil?
+      s = letter.to_s
+      raise ArgumentError if s.empty?
+      raise ArgumentError unless s.length == 1 && s =~ /[A-Za-z]/
+  
+      ch = s.downcase
+  
+      # Already guessed?
+      return false if @guesses.include?(ch) || @wrong_guesses.include?(ch)
+  
+      # Correct vs wrong
+      if @word.downcase.include?(ch)
+        @guesses << ch
+      else
+        @wrong_guesses << ch
+      end
+  
+      true
+    end
+  
+    # Reveal the word with dashes for unguessed letters
+    def word_with_guesses
+      @word.chars.map { |c|
+        @guesses.include?(c.downcase) ? c : '-'
+      }.join
+    end
+  
+    # :win if all letters guessed, :lose after 7 wrong guesses, else :play
+    def check_win_or_lose
+      return :win  if word_with_guesses == @word
+      return :lose if @wrong_guesses.length >= 7
+      :play
     end
   end
-end
+  

@@ -23,4 +23,5 @@ group :development, :test do
   gem 'simplecov',    '~> 0.22', require: false
   gem 'launchy',      '~> 3.0'
   gem 'webmock',      '~> 3.23'
+
 end
